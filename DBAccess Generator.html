@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="author" content="biblenoir">
+        <script>
+            function generator() {
+                tabNum = 1;
+
+                var sql = document.getElementById("sql").value;
+                var lines = sql.split("\n");
+                for (var i = 0; i < lines.length; i++) {
+                    if (lines[i] == "" || typeof(lines[i]) == "undefined") {
+                            lines.splice(i, 1);
+                    }
+                }
+
+                var methodName = document.getElementById("methodName").value;
+                var methodType = document.getElementById("methodType").value;
+                var statementType = document.getElementById("statementType").value;
+                var resultSet = document.getElementById("resultSet").value;
+
+                // before sql
+                var initialBlock = "" + 
+                formatter("public " + methodType + " " + methodName + "() throws Exception {") +
+                formatter("") +
+                formatter("// ステートメント");
+
+                var statement = "";
+                if (statementType == "Statement") {
+                    initialBlock = initialBlock + 
+                    formatter("Statement stmt = null;");
+                    statement = "stmt";
+                } else {
+                    initialBlock = initialBlock + 
+                    formatter("PreparedStatement ps = null;");
+                    statement = "ps";
+                }
+
+                if (resultSet == "1") {
+                    initialBlock = initialBlock + 
+                    formatter("// ＤＢ結果") +
+                    formatter("ResultSet rs = null;");
+                }
+
+                initialBlock = initialBlock + 
+                formatter("// ＳＱＬ") +
+                formatter("StringBuffer sql = new StringBuffer();") +
+                formatter("") +
+                formatter("try {");
+
+                if (statementType == "Statement") {
+                    initialBlock = initialBlock + 
+                    formatter("stmt = con.createStatement();");
+                }
+
+                // sql
+                var sqlBlock = formatter("");
+                for (i = 0; i < lines.length; i++) {
+                    lines[i] = ".append(\" " + lines[i] + " \").append(C_CR)";
+                    if (i == 0) {
+                        lines[i] = formatter("sql" + lines[i]);
+                    } else if (i == lines.length - 1) {
+                        lines[i] = formatter("   " + lines[i] + ";");
+                    } else {
+                        lines[i] = formatter("   " + lines[i]);
+                    }
+                    sqlBlock = sqlBlock + lines[i];
+                }
+
+                // after sql
+                var finalBlock = formatter("") + 
+                formatter("// ログ出力") +
+                formatter("LOG.debug(sql.toString());");
+
+                if (statementType == "PreparedStatement") {
+                    finalBlock = finalBlock + 
+                    formatter("ps = con.prepareStatement(sql.toString());");
+                }
+
+                if (resultSet == "1") {
+                    if (statementType == "Statement") {
+                        finalBlock = finalBlock + 
+                        formatter("rs = stmt.executeQuery(sql.toString());");
+                    } else {
+                        finalBlock = finalBlock + 
+                        formatter("rs = ps.executeQuery();");
+                    }
+                    finalBlock = finalBlock + 
+                    formatter("") +
+                    formatter("while (rs.next()) {") +
+                    formatter("") +
+                    formatter("}");
+                }
+
+                finalBlock = finalBlock + 
+                formatter("") + 
+                formatter("} catch (SQLException e) {") +
+                formatter("LOG.error(sql.toString());") +
+                formatter("LOG.error(\"Error with connection: \" + e);") +
+                formatter("throw e;") +
+                formatter("} finally {") +
+                formatter("try {");
+
+                if (resultSet == "1") {
+                    finalBlock = finalBlock + 
+                    formatter("if (rs != null) {") +
+                    formatter("rs.close();") +
+                    formatter("}");
+                }
+
+                finalBlock = finalBlock +
+                formatter("if (" + statement + " != null) {") +
+                formatter(statement + ".close();") +
+                formatter("}") +
+                formatter("} catch (SQLException ex) {") +
+                formatter("LOG.error(\"Error with connection: \" + ex);") +
+                formatter("throw ex;") +
+                formatter("}") +
+                formatter("}");
+
+                if (methodType != "void") {
+                    finalBlock = finalBlock + 
+                    formatter("return ;");
+                }
+
+                finalBlock = finalBlock + 
+                formatter("}");
+
+
+                document.getElementById("dbAccess").value = initialBlock + sqlBlock + finalBlock;
+            }
+
+            function formatter(code) {
+                var tab = "    ".repeat(tabNum);
+                if (code.indexOf("}") != -1) {
+                    tabNum = tabNum - 1;
+                    tab = "    ".repeat(tabNum);
+                }
+                var formattedCode = tab + code + "\n";
+                if (code.indexOf("{") != -1){
+                    tabNum = tabNum + 1;
+                    tab = "    ".repeat(tabNum);
+                }
+                return formattedCode;
+            }
+
+            function clearValue() {
+                // document.getElementById("sql").value = "";
+                document.getElementById("dbAccess").value = "";
+            }
+
+            function resultSetValue() {
+                if (document.getElementById("resultSet").value == "0") {
+                    document.getElementById("resultSet").value = "1";
+                } else {
+                    document.getElementById("resultSet").value = "0";
+                }
+            }
+
+        </script>
+
+    </head>
+    <body>
+        <h1 align="center">DBAccess Generator</h1>
+        <!-- customize -->
+        <div align="center">
+            <input id="methodType" value="methodType">
+            <input id="methodName" value="methodName">
+            <select id="statementType">
+                    <option value="Statement">Statement</option>
+                    <option value="PreparedStatement">PreparedStatement</option>
+            </select>
+            <input type="checkbox" id="resultSet" value="0" onclick="resultSetValue()">
+            <label for="checkbox">ResultSet</label>
+            <button type="button" onclick="generator()">
+                Generate!
+            </button>
+            <button type="button" onclick="clearValue()">
+                Clear!
+            </button>
+        </div>
+        <!-- textarea -->
+        <table align="center">
+            <tr>
+                <td>SQL:</td>
+                <td>Java Method:</td>
+            </tr>
+            <tr>
+                <td>
+                    <textarea id="sql" rows="40" cols="80"></textarea>
+                </td>
+                <td>
+                    <textarea id="dbAccess" rows="40" cols="80"></textarea>
+                </td>
+            </tr>
+            <tr>
+                <td>※SQL must be formatted</td>
+            </tr>
+        </table>
+    </body>
+</html> 
